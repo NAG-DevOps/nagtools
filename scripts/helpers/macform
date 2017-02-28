@@ -1,0 +1,64 @@
+#!/usr/bin/perl -w
+use strict;
+
+use Getopt::Std;
+
+my %opt = ();
+
+my $USAGE=<<EOU;
+Usage: $0 [-r] [-e] [-a] [-w] [-c] mac-address
+
+       -r: "Raw" (0123456789ab) 
+            12 lowercase hex digits
+       -e: "Ethers" (01:23:45:67:89:ab) 
+            6 pairs of ":"-separated lowercase hex digits
+       -a: "Argus" (1:23:45:67:89:ab) 
+            same as -e, but suppressing any leading zeros in each pair
+       -w: "Windows" (01-23-45-67-89-AB) 
+            same as -e, but "-"-separated and uppercase
+       -c: "Cisco" 0123.4567.89ab) 
+            same as -r, but in "."-separated groups of 3 hex digits
+
+       If no options are given, all formats are displayed on one 
+       line of output in order:  Raw Ethers Argus Windows Cisco.
+
+       The mac-address argument may be given in any of the
+       formats listed.
+EOU
+
+getopts('reawc', \%opt)
+   or die $USAGE;
+
+my $mac = shift || die $USAGE;
+
+$mac = lc($mac);
+
+if ( $mac =~ /^([a-f0-9]{4})\.([a-f0-9]{4})\.([a-f0-9]{4})$/ ) {
+     # Cisco format
+     $mac = "$1$2$3";
+} elsif ( $mac =~ /^([a-f0-9]{12})$/ ) {
+     # Raw format
+     $mac = $1;
+} elsif ( $mac =~ /^([a-f0-9]{1,2}[:-]){5}[a-f0-9]{1,2}$/ ) {
+     # Ethers, Argus or Windows format
+     $mac = sprintf("%02x%02x%02x%02x%02x%02x",map{hex}split(/[:-]/,$mac));
+} else {
+     die "$USAGE\n\nBad mac: $mac\n";
+}
+
+# If no options given assume all are wanted
+if ( scalar(keys(%opt)) == 0 ) {
+   @opt{qw(r e a w c)} = 1 x 5;
+}
+
+my @result = ();
+
+push(@result, $mac) if exists $opt{r};
+push(@result, join(":",unpack("A2 A2 A2 A2 A2 A2",$mac))) if exists $opt{e};
+push(@result, join(":",map{s/^0//;$_} unpack("A2 A2 A2 A2 A2 A2",$mac))) if exists $opt{a};
+push(@result, uc join("-", unpack("A2 A2 A2 A2 A2 A2",$mac))) if exists $opt{w};
+push(@result, join(".",unpack("A4 A4 A4",$mac))) if exists $opt{c};
+
+print "@result\n";
+
+exit 0;
